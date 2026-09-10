@@ -44,11 +44,14 @@ npm run dev
 ```
 
 📦 Build & Preview
+
+```bash
 # Build for production
 npm run build
 
 # Preview production build locally
 npm run preview
+```
 
 🧞 Astro Commands
 Command	Action
