@@ -5,6 +5,23 @@ const TZ  = 'Asia%2FKathmandu';
 const API = 'https://api.open-meteo.com/v1/forecast';
 const AQ  = 'https://air-quality-api.open-meteo.com/v1/air-quality';
 
+// Current Nepal-time label, e.g. "4:35 PM".
+  const nptLabel = (d = new Date()) =>
+   d.toLocaleTimeString('en-US', {
+    timeZone: 'Asia/Kathmandu',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    });
+
+    // Current Nepal-time string in "YYYY-MM-DDTHH:MM" form, so we can lexically
+    // compare it against Open-Meteo's minutely_15 slot times (which are already
+    // in Asia/Kathmandu because we pass timezone in the request).
+  const nptIsoMinute = (d = new Date()) =>
+    d.toLocaleString('sv-SE', { timeZone: 'Asia/Kathmandu' })
+    .slice(0, 16)
+    .replace(' ', 'T');
+
 async function fetchWeather(lat, lon) {
   const fc = `${API}?latitude=${lat}&longitude=${lon}`
     + `&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,`
@@ -25,35 +42,42 @@ async function fetchWeather(lat, lon) {
   return { f, a };
 }
 
-/* Nowcast: read 15-minute precipitation slots, convert to mm/hr, describe. */
-function nowcast(minutely, currentIso) {
+function nowcast(minutely /* currentIso no longer needed */) {
   const t = minutely?.time, p = minutely?.precipitation;
   if (!t?.length || !p?.length) return { state: 'unknown', text: '' };
 
-  const nowKey = currentIso.slice(0, 13);
-  let i = t.findIndex(x => x.slice(0, 13) === nowKey);
-  if (i < 0) i = 0;
+  // Find the last slot whose time is <= now (Nepal time). That's the slot
+  // currently underway.
+  const nowStr = nptIsoMinute();
+  let cur = -1;
+  for (let k = 0; k < t.length; k++) {
+    if (t[k].slice(0, 16) <= nowStr) cur = k;
+    else break;
+  }
 
-  const mmhr = k => (p[k] ?? 0) * 4;      // 15-min mm → mm/hr
-  const now  = mmhr(i);
-  const next = Array.from({ length: 8 }, (_, k) => mmhr(i + k));   // next 2 hours
-  const peak = Math.max(...next);
-  const peakAt = i + next.indexOf(peak);
+  const mmhr = k => (p[k] ?? 0) * 4;                 // 15-min mm → mm/hr
+  const now  = cur >= 0 ? mmhr(cur) : 0;
+  const from = cur + 1;                              // first future slot
+
+  // 8 future slots = next 2 hours. Does NOT include the partial current slot.
+  const next   = Array.from({ length: 8 }, (_, k) => mmhr(from + k));
+  const peak   = Math.max(...next);
+  const peakAt = from + next.indexOf(peak);
 
   const isRaining = now >= 0.1;
 
   let firstWet = -1;
-  for (let k = 1; k < next.length; k++) if (next[k] >= 0.1) { firstWet = k; break; }
+  for (let k = 0; k < next.length; k++) if (next[k] >= 0.1) { firstWet = k; break; }
 
   let stop = -1;
   if (isRaining && firstWet === -1) {
-    for (let k = 1; k < 12 && i + k < p.length; k++) {
-      if ((p[i + k] ?? 0) < 0.02) { stop = k; break; }
+    for (let k = 1; k < 12 && cur + k < p.length; k++) {
+      if ((p[cur + k] ?? 0) < 0.02) { stop = k; break; }
     }
   }
 
   const grade = intensity(peak);
-  const mins  = k => k * 15;
+  const mins  = k => Math.max(15, k * 15);
 
   if (!isRaining && firstWet !== -1) {
     return {
@@ -79,22 +103,32 @@ function nowcast(minutely, currentIso) {
   return {
     state: 'dry',
     text: 'No rain expected in the next 2 hours',
-    detail: peak > 0.1 ? `Later peak ${peak.toFixed(1)} mm/h around ${hour12(t[peakAt])}` : '',
+    detail: peak > 0.1
+      ? `Later peak ${peak.toFixed(1)} mm/h around ${hour12(t[peakAt])}`
+      : '',
   };
 }
 
 /* Rule-based alerts for Nepal. Clearly NOT official warnings. */
-function alertsFor(f, a) {
+function alertsFor(f, a, nc) {
   const d = f.daily, c = f.current, out = [];
+
+  // Rain alerts only fire when the nowcast actually says rain is
+  // current or imminent. Otherwise they stay silent, even if the day's
+  // forecast total is high.
+  const activeRain =
+    nc && (nc.state === 'raining' || nc.state === 'starting' || nc.state === 'stopping');
 
   const rain0 = d.precipitation_sum[0] ?? 0;
   const rain1 = d.precipitation_sum[1] ?? 0;
   const pop0  = d.precipitation_probability_max[0] ?? 0;
 
-  if (rain0 >= 100 || rain1 >= 100 || (pop0 >= 80 && rain0 >= 50))
-    out.push(['bad', '🌧️ <b>Heavy rain expected.</b> Flood and landslide risk in hill and Tarai districts. Avoid landslide-prone roads.']);
-  else if (rain0 >= 50 || pop0 >= 70)
-    out.push(['warn', '🌦️ <b>Significant rain likely.</b> Carry rain gear and watch for localised flooding.']);
+  if (activeRain) {
+    if (rain0 >= 100 || rain1 >= 100 || (pop0 >= 80 && rain0 >= 50))
+      out.push(['bad', '🌧️ <b>Heavy rain expected.</b> Flood and landslide risk in hill and Tarai districts. Avoid landslide-prone roads.']);
+    else if (rain0 >= 50 || pop0 >= 70)
+      out.push(['warn', '🌦️ <b>Significant rain likely.</b> Carry rain gear and watch for localised flooding.']);
+  }
 
   if (d.temperature_2m_max[0] >= 38)
     out.push(['bad', '🔥 <b>Heat wave conditions.</b> Stay hydrated, avoid outdoor work 11am–4pm.']);
@@ -108,7 +142,7 @@ function alertsFor(f, a) {
   return out;
 }
 
-function render(root, loc, f, a) {
+function render(root, loc, f, a, updatedAt= new Date()) {
   const c = f.current, d = f.daily, h = f.hourly;
   const [cond, emo] = wx(c.weather_code);
 
@@ -116,8 +150,8 @@ function render(root, loc, f, a) {
   let i0 = h.time.findIndex(t => t.slice(0, 13) === nowIso);
   if (i0 < 0) i0 = 0;
 
-  const nc     = nowcast(f.minutely_15, c.time);
-  const alerts = alertsFor(f, a);
+  const nc     = nowcast(f.minutely_15);
+  const alerts = alertsFor(f, a, nc);
   const [aqTxt, aqCol] = aqi(a?.current?.us_aqi);
   const rain0  = d.precipitation_sum[0] ?? 0;
 
@@ -134,7 +168,7 @@ function render(root, loc, f, a) {
             H ${Math.round(d.temperature_2m_max[0])}° L ${Math.round(d.temperature_2m_min[0])}°</div>
         </div>
         <div class="meta">
-          Updated ${hour12(c.time)} NPT<br>
+          Updated ${nptLabel(updatedAt)} NPT · Data ${hour12(c.time)}<br>
           ${loc.lat.toFixed(3)}°N, ${loc.lon.toFixed(3)}°E<br>
           Open-Meteo
         </div>
@@ -227,11 +261,12 @@ export async function mount(rootId, loc) {
     render(root, loc, f, a);
     try { localStorage.setItem(`wx:${loc.slug}`, JSON.stringify({ f, a, at: Date.now() })); } catch {}
   } catch (e) {
+    console.error('mount failed:', e);
     let cached = null;
     try { cached = JSON.parse(localStorage.getItem(`wx:${loc.slug}`) || 'null'); } catch {}
 
     if (cached) {
-      render(root, loc, cached.f, cached.a);
+      render(root, loc, cached.f, cached.a, newDate(cached.at));
       const age = Math.round((Date.now() - cached.at) / 60000);
       root.insertAdjacentHTML('afterbegin',
         `<div class="alert a-warn">📴 Offline — showing data from ${age} min ago.</div>`);
