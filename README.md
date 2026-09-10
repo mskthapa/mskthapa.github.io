@@ -41,3 +41,24 @@ npm install
 
 # Start development server
 npm run dev
+
+📦 Build & Preview
+# Build for production
+npm run build
+
+# Preview production build locally
+npm run preview
+
+🧞 Astro Commands
+Command	Action
+npm install	Installs dependencies
+npm run dev	Starts local dev server at localhost:4321
+npm run build	Build your production site to ./dist/
+npm run preview	Preview your build locally, before deploying
+
+🔮 Future Improvements
+ Add 5-day forecast
+ Nepali language support (नेपाली)
+ Weather icons/animations
+ Dark mode toggle
+ PWA support
