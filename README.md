@@ -41,6 +41,7 @@ npm install
 
 # Start development server
 npm run dev
+```
 
 📦 Build & Preview
 # Build for production
