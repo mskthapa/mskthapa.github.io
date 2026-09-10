@@ -68,3 +68,10 @@ npm run preview
  - Weather icons/animations
  - Dark mode toggle
  - PWA support
+   
+## 📄 License
+MIT License - feel free to use and modify!
+
+```bash
+
+Copy and paste this entire block into your `README.md` file and it's ready to go!
