@@ -1,0 +1,98 @@
+---
+import '../styles/global.css';
+import { LOCATIONS } from '../data/locations';
+
+interface Props {
+  title: string;
+  description?: string;
+}
+const {
+  title,
+  description = 'Live weather, 2-hour rain nowcast, 10-day forecast and air quality for cities and trekking routes across Nepal.',
+} = Astro.props;
+---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{title}</title>
+  <meta name="description" content={description} />
+  <link rel="canonical" href={new URL(Astro.url.pathname, Astro.site)} />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="theme-color" content="#0b1220" />
+  <meta property="og:title" content={title} />
+  <meta property="og:description" content={description} />
+  <meta property="og:type" content="website" />
+  <link rel="icon" href="/icons/icon-192.png" />
+</head>
+<body>
+    
+  <div class="wrap">
+    <header class="top">
+      <a class="brand" href="/">🇳🇵 Nepal Weather</a>
+      <input id="q" type="search" list="loc-list" placeholder="Search city or trekking spot…" autocomplete="off" />
+      <datalist id="loc-list">
+        {LOCATIONS.map(l => <option value={l.en}>{l.ne}</option>)}
+      </datalist>
+    </header>
+
+    <slot />
+
+    <footer class="site-footer">
+      Forecast data: <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> (CC BY 4.0) ·
+      Official warnings: <a href="https://www.dhm.gov.np/" target="_blank" rel="noopener">DHM Nepal</a><br />
+      Forecasts are indicative only. Always check DHM for official warnings.
+      <p class="credit">Made by <a href="https://mskthapa.netlify.app/" target="_blank" rel="noopener">MSK Thapa</a></p>
+    </footer>
+  </div>
+
+  <script>
+    import { LOCATIONS } from '../data/locations';
+
+    const slugMap = Object.fromEntries(
+      LOCATIONS.map(l => [l.en.toLowerCase(), l.slug])
+    );
+
+    const q = document.getElementById('q');
+    q?.addEventListener('change', () => {
+      const raw = q.value.trim();
+      if (!raw) return;
+      const slug = slugMap[raw.toLowerCase()];
+      if (slug) {
+        location.href = '/weather/' + slug;
+      } else {
+        alert("That location isn't in our list yet. Pick from the suggestions as you type.");
+      }
+    });
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
+
+<style>
+  .site-footer {
+    text-align: center;
+    padding: 2rem 1rem;
+    font-size: 0.875rem;
+    color: #6b7280;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    margin-top: 3rem;
+  }
+  .site-footer a {
+    color: #2563eb;
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .site-footer a:hover {
+    text-decoration: underline;
+  }
+  .credit {
+    margin-top: 0.75rem;
+  }
+</style>

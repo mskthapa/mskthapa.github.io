@@ -1,0 +1,44 @@
+---
+import Base from '../layouts/Base.astro';
+import { CITIES, TREKS } from '../data/locations';
+
+const home = CITIES[0]; // Kathmandu
+---
+<Base title="Nepal Weather — Live forecast, rain nowcast and air quality">
+  <nav class="chips">
+    {CITIES.map(l => <a class="chip" href={`/weather/${l.slug}`}>{l.en}</a>)}
+  </nav>
+
+  <div
+    id="wx"
+    data-slug={home.slug}
+    data-en={home.en}
+    data-ne={home.ne}
+    data-lat={home.lat}
+    data-lon={home.lon}
+  >
+    <div class="card"><div class="state">Loading weather…</div></div>
+  </div>
+
+  <div class="card">
+    <h2>Trekking routes</h2>
+    <div class="chips" style="margin:0">
+      {TREKS.map(l => <a class="chip" href={`/weather/${l.slug}`}>🏔 {l.en}</a>)}
+    </div>
+  </div>
+</Base>
+
+<script>
+  import { mount } from '../scripts/weather.js';
+
+  const el = document.getElementById('wx');
+  if (el) {
+    mount('wx', {
+      slug: el.dataset.slug,
+      en: el.dataset.en,
+      ne: el.dataset.ne,
+      lat: parseFloat(el.dataset.lat),
+      lon: parseFloat(el.dataset.lon),
+    });
+  }
+</script>

@@ -1,0 +1,45 @@
+---
+import Base from '../../layouts/Base.astro';
+import { LOCATIONS } from '../../data/locations';
+
+export function getStaticPaths() {
+  return LOCATIONS.map(l => ({ params: { slug: l.slug }, props: { loc: l } }));
+}
+
+const { loc } = Astro.props;
+const title = `${loc.en} Weather — Today, Nowcast & 10-Day Forecast | Nepal Weather`;
+const description = `Live weather in ${loc.en}, Nepal. Rain nowcast for the next 2 hours, hourly and 10-day forecast, air quality and alerts.`;
+---
+<Base {title} {description}>
+  <nav class="chips">
+    {LOCATIONS.filter(l => l.slug !== loc.slug).slice(0, 12).map(l =>
+      <a class="chip" href={`/weather/${l.slug}`}>{l.en}</a>
+    )}
+  </nav>
+
+  <div
+    id="wx"
+    data-slug={loc.slug}
+    data-en={loc.en}
+    data-ne={loc.ne}
+    data-lat={loc.lat}
+    data-lon={loc.lon}
+  >
+    <div class="card"><div class="state">Loading weather…</div></div>
+  </div>
+</Base>
+
+<script>
+  import { mount } from '../../scripts/weather.js';
+
+  const el = document.getElementById('wx');
+  if (el && el.dataset.lat) {
+    mount('wx', {
+      slug: el.dataset.slug,
+      en: el.dataset.en,
+      ne: el.dataset.ne,
+      lat: parseFloat(el.dataset.lat),
+      lon: parseFloat(el.dataset.lon),
+    });
+  }
+</script>
