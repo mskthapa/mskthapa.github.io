@@ -1,0 +1,1 @@
+import{t as e}from"./weather.DeUcdEdp.js";var t=document.getElementById(`wx`);t&&t.dataset.lat&&e(`wx`,{slug:t.dataset.slug,en:t.dataset.en,ne:t.dataset.ne,lat:parseFloat(t.dataset.lat),lon:parseFloat(t.dataset.lon)});

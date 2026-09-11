@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.mskthapa.nepalweather",
+      "sha256_cert_fingerprints": [
+        "0A:03:8E:CE:15:41:3E:5A:F1:11:54:93:F9:DF:2D:7E:CD:DB:C0:1F:09:AA:F2:CC:03:D5:18:18:DE:5B:60:8E"
+      ]
+    }
+  }
+]
